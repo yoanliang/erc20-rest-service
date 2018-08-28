@@ -54,7 +54,6 @@ public class Controller {
             @RequestBody ContractSpecification contractSpecification) throws Exception {
 
         return ContractService.deploy(
-                extractPrivateFor(request),
                 contractSpecification.getInitialAmount(),
                 contractSpecification.getTokenName(),
                 contractSpecification.getDecimalUnits(),
@@ -107,7 +106,6 @@ public class Controller {
             @PathVariable String contractAddress,
             @RequestBody TransferFromRequest transferFromRequest) throws Exception {
         return ContractService.transferFrom(
-                extractPrivateFor(request),
                 contractAddress,
                 transferFromRequest.getFrom(),
                 transferFromRequest.getTo(),
@@ -155,7 +153,6 @@ public class Controller {
             @PathVariable String contractAddress,
             @RequestBody TransferRequest transferRequest) throws Exception {
         return ContractService.transfer(
-                extractPrivateFor(request),
                 contractAddress,
                 transferRequest.getTo(),
                 transferRequest.getValue());
@@ -176,7 +173,6 @@ public class Controller {
             @PathVariable String contractAddress,
             @RequestBody ApproveAndCallRequest approveAndCallRequest) throws Exception {
         return ContractService.approveAndCall(
-                extractPrivateFor(request),
                 contractAddress,
                 approveAndCallRequest.getSpender(),
                 approveAndCallRequest.getValue(),

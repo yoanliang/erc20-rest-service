@@ -1,5 +1,6 @@
 package io.blk.erc20;
 
+import java.io.IOException;
 import java.math.BigInteger;
 import java.util.Collections;
 import java.util.List;
@@ -13,6 +14,9 @@ import org.springframework.beans.factory.annotation.Autowired;
 
 import org.springframework.stereotype.Service;
 
+import org.web3j.crypto.CipherException;
+import org.web3j.crypto.Credentials;
+import org.web3j.crypto.WalletUtils;
 import org.web3j.protocol.core.methods.response.TransactionReceipt;
 import org.web3j.quorum.Quorum;
 import org.web3j.quorum.tx.ClientTransactionManager;
@@ -31,16 +35,20 @@ public class ContractService {
 
     private final NodeConfiguration nodeConfiguration;
 
+    private final Credentials credentials;
+
     @Autowired
-    public ContractService(Quorum quorum, NodeConfiguration nodeConfiguration) {
+    public ContractService(Quorum quorum, NodeConfiguration nodeConfiguration) throws IOException, CipherException {
         this.quorum = quorum;
         this.nodeConfiguration = nodeConfiguration;
+        this.credentials = WalletUtils.loadCredentials(nodeConfiguration.getPassword(), nodeConfiguration.getSource());
     }
 
     public NodeConfiguration getConfig() {
         return nodeConfiguration;
     }
 
+    @Deprecated
     public String deploy(
             List<String> privateFor, BigInteger initialAmount, String tokenName, BigInteger decimalUnits,
             String tokenSymbol) throws Exception {
@@ -57,8 +65,22 @@ public class ContractService {
         }
     }
 
+    public String deploy(
+            BigInteger initialAmount, String tokenName, BigInteger decimalUnits,
+            String tokenSymbol) throws Exception {
+        try {
+            HumanStandardToken humanStandardToken = HumanStandardToken.deploy(
+                    quorum, this.credentials, GAS_PRICE, GAS_LIMIT,
+                    initialAmount, tokenName, decimalUnits,
+                    tokenSymbol).send();
+            return humanStandardToken.getContractAddress();
+        } catch (InterruptedException | ExecutionException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
     public String name(String contractAddress) throws Exception {
-        HumanStandardToken humanStandardToken = load(contractAddress);
+        HumanStandardToken humanStandardToken = load(contractAddress, this.credentials);
         try {
             return humanStandardToken.name().send();
         } catch (InterruptedException | ExecutionException e) {
@@ -68,7 +90,7 @@ public class ContractService {
 
     public TransactionResponse<ApprovalEventResponse> approve(
             List<String> privateFor, String contractAddress, String spender, BigInteger value) throws Exception {
-        HumanStandardToken humanStandardToken = load(contractAddress, privateFor);
+        HumanStandardToken humanStandardToken = load(contractAddress, this.credentials);
         try {
             TransactionReceipt transactionReceipt = humanStandardToken
                     .approve(spender, value).send();
@@ -79,7 +101,7 @@ public class ContractService {
     }
 
     public long totalSupply(String contractAddress) throws Exception {
-        HumanStandardToken humanStandardToken = load(contractAddress);
+        HumanStandardToken humanStandardToken = load(contractAddress, this.credentials);
         try {
             return extractLongValue(humanStandardToken.totalSupply().send());
         } catch (InterruptedException | ExecutionException e) {
@@ -87,6 +109,7 @@ public class ContractService {
         }
     }
 
+    @Deprecated
     public TransactionResponse<TransferEventResponse> transferFrom(
             List<String> privateFor, String contractAddress, String from, String to, BigInteger value) throws Exception {
         HumanStandardToken humanStandardToken = load(contractAddress, privateFor);
@@ -99,8 +122,20 @@ public class ContractService {
         }
     }
 
+    public TransactionResponse<TransferEventResponse> transferFrom(
+            String contractAddress, String from, String to, BigInteger value) throws Exception {
+        HumanStandardToken humanStandardToken = load(contractAddress, this.credentials);
+        try {
+            TransactionReceipt transactionReceipt = humanStandardToken
+                    .transferFrom(from, to, value).send();
+            return processTransferEventsResponse(humanStandardToken, transactionReceipt);
+        } catch (InterruptedException | ExecutionException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
     public long decimals(String contractAddress) throws Exception {
-        HumanStandardToken humanStandardToken = load(contractAddress);
+        HumanStandardToken humanStandardToken = load(contractAddress, this.credentials);
         try {
             return extractLongValue(humanStandardToken.decimals().send());
         } catch (InterruptedException | ExecutionException e) {
@@ -109,7 +144,7 @@ public class ContractService {
     }
 
     public String version(String contractAddress) throws Exception {
-        HumanStandardToken humanStandardToken = load(contractAddress);
+        HumanStandardToken humanStandardToken = load(contractAddress, this.credentials);
         try {
             return humanStandardToken.version().send();
         } catch (InterruptedException | ExecutionException e) {
@@ -118,7 +153,7 @@ public class ContractService {
     }
 
     public long balanceOf(String contractAddress, String ownerAddress) throws Exception {
-        HumanStandardToken humanStandardToken = load(contractAddress);
+        HumanStandardToken humanStandardToken = load(contractAddress, this.credentials);
         try {
             return extractLongValue(humanStandardToken.balanceOf(ownerAddress).send());
         } catch (InterruptedException | ExecutionException e) {
@@ -127,7 +162,7 @@ public class ContractService {
     }
 
     public String symbol(String contractAddress) throws Exception {
-        HumanStandardToken humanStandardToken = load(contractAddress);
+        HumanStandardToken humanStandardToken = load(contractAddress, this.credentials);
         try {
             return humanStandardToken.symbol().send();
         } catch (InterruptedException | ExecutionException e) {
@@ -135,6 +170,7 @@ public class ContractService {
         }
     }
 
+    @Deprecated
     public TransactionResponse<TransferEventResponse> transfer(
             List<String> privateFor, String contractAddress, String to, BigInteger value) throws Exception {
         HumanStandardToken humanStandardToken = load(contractAddress, privateFor);
@@ -147,6 +183,19 @@ public class ContractService {
         }
     }
 
+    public TransactionResponse<TransferEventResponse> transfer(
+            String contractAddress, String to, BigInteger value) throws Exception {
+        HumanStandardToken humanStandardToken = load(contractAddress, this.credentials);
+        try {
+            TransactionReceipt transactionReceipt = humanStandardToken
+                    .transfer(to, value).send();
+            return processTransferEventsResponse(humanStandardToken, transactionReceipt);
+        } catch (InterruptedException | ExecutionException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    @Deprecated
     public TransactionResponse<ApprovalEventResponse> approveAndCall(
             List<String> privateFor, String contractAddress, String spender, BigInteger value,
             String extraData) throws Exception {
@@ -163,8 +212,24 @@ public class ContractService {
         }
     }
 
+    public TransactionResponse<ApprovalEventResponse> approveAndCall(
+            String contractAddress, String spender, BigInteger value,
+            String extraData) throws Exception {
+        HumanStandardToken humanStandardToken = load(contractAddress, this.credentials);
+        try {
+            TransactionReceipt transactionReceipt = humanStandardToken
+                    .approveAndCall(
+                            spender, value,
+                            extraData.getBytes())
+                    .send();
+            return processApprovalEventResponse(humanStandardToken, transactionReceipt);
+        } catch (InterruptedException | ExecutionException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
     public long allowance(String contractAddress, String ownerAddress, String spenderAddress) throws Exception {
-        HumanStandardToken humanStandardToken = load(contractAddress);
+        HumanStandardToken humanStandardToken = load(contractAddress, this.credentials);
         try {
             return extractLongValue(humanStandardToken.allowance(
                     ownerAddress, spenderAddress)
@@ -174,6 +239,7 @@ public class ContractService {
         }
     }
 
+    @Deprecated
     private HumanStandardToken load(String contractAddress, List<String> privateFor) {
         TransactionManager transactionManager = new ClientTransactionManager(
                 quorum, nodeConfiguration.getFromAddress(), privateFor);
@@ -181,11 +247,17 @@ public class ContractService {
                 contractAddress, quorum, transactionManager, GAS_PRICE, GAS_LIMIT);
     }
 
+    @Deprecated
     private HumanStandardToken load(String contractAddress) {
         TransactionManager transactionManager = new ClientTransactionManager(
                 quorum, nodeConfiguration.getFromAddress(), Collections.emptyList());
         return HumanStandardToken.load(
                 contractAddress, quorum, transactionManager, GAS_PRICE, GAS_LIMIT);
+    }
+
+    private HumanStandardToken load(String contractAddress, Credentials credentials) {
+        return HumanStandardToken.load(
+                contractAddress, quorum, credentials, GAS_PRICE, GAS_LIMIT);
     }
 
     private long extractLongValue(BigInteger value) {

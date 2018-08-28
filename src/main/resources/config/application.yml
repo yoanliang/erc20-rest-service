@@ -8,8 +8,12 @@ logging:
 
 # Endpoint of an Ethereum or Quorum node we wish to use.
 # To use IPC simply provide a file path to the socket, such as /path/to/geth.ipc
-nodeEndpoint: http://localhost:22000
+nodeEndpoint: localhost:20000
 
 # The Ethereum or Quorum address we wish to use when transacting.
 # Note - this address must be already unlocked in the client
-fromAddress: "0xed9d02e382b34818e88b88a309c7fe71e65f419d"
+fromAddress: "0x167074ef05e6d33592aada6efce7b43c37f0292f"
+
+credentials:
+  password:
+  source:
