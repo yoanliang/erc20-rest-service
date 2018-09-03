@@ -1,6 +1,7 @@
 package io.blk.erc20;
 
 import java.io.IOException;
+import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.util.Collections;
 import java.util.List;
@@ -17,10 +18,12 @@ import org.springframework.stereotype.Service;
 import org.web3j.crypto.CipherException;
 import org.web3j.crypto.Credentials;
 import org.web3j.crypto.WalletUtils;
+import org.web3j.protocol.Web3j;
 import org.web3j.protocol.core.methods.response.TransactionReceipt;
-import org.web3j.quorum.Quorum;
 import org.web3j.quorum.tx.ClientTransactionManager;
 import org.web3j.tx.TransactionManager;
+import org.web3j.tx.Transfer;
+import org.web3j.utils.Convert;
 
 import static org.web3j.tx.Contract.GAS_LIMIT;
 import static org.web3j.tx.ManagedTransaction.GAS_PRICE;
@@ -31,15 +34,15 @@ import static org.web3j.tx.ManagedTransaction.GAS_PRICE;
 @Service
 public class ContractService {
 
-    private final Quorum quorum;
+    private final Web3j web3j;
 
     private final NodeConfiguration nodeConfiguration;
 
     private final Credentials credentials;
 
     @Autowired
-    public ContractService(Quorum quorum, NodeConfiguration nodeConfiguration) throws IOException, CipherException {
-        this.quorum = quorum;
+    public ContractService(Web3j web3j, NodeConfiguration nodeConfiguration) throws IOException, CipherException {
+        this.web3j = web3j;
         this.nodeConfiguration = nodeConfiguration;
         this.credentials = WalletUtils.loadCredentials(nodeConfiguration.getPassword(), nodeConfiguration.getSource());
     }
@@ -54,9 +57,9 @@ public class ContractService {
             String tokenSymbol) throws Exception {
         try {
             TransactionManager transactionManager = new ClientTransactionManager(
-                    quorum, nodeConfiguration.getFromAddress(), privateFor);
+                    web3j, nodeConfiguration.getFromAddress(), privateFor);
             HumanStandardToken humanStandardToken = HumanStandardToken.deploy(
-                    quorum, transactionManager, GAS_PRICE, GAS_LIMIT,
+                    web3j, transactionManager, GAS_PRICE, GAS_LIMIT,
                     initialAmount, tokenName, decimalUnits,
                     tokenSymbol).send();
             return humanStandardToken.getContractAddress();
@@ -70,7 +73,7 @@ public class ContractService {
             String tokenSymbol) throws Exception {
         try {
             HumanStandardToken humanStandardToken = HumanStandardToken.deploy(
-                    quorum, this.credentials, GAS_PRICE, GAS_LIMIT,
+                    web3j, this.credentials, GAS_PRICE, GAS_LIMIT,
                     initialAmount, tokenName, decimalUnits,
                     tokenSymbol).send();
             return humanStandardToken.getContractAddress();
@@ -187,8 +190,11 @@ public class ContractService {
             String contractAddress, String to, BigInteger value) throws Exception {
         HumanStandardToken humanStandardToken = load(contractAddress, this.credentials);
         try {
-            TransactionReceipt transactionReceipt = humanStandardToken
-                    .transfer(to, value).send();
+//            TransactionReceipt transactionReceipt = humanStandardToken
+//                    .transfer(to, value).send();
+            TransactionReceipt transactionReceipt = Transfer.sendFunds(
+                    web3j, credentials, to,
+                    BigDecimal.valueOf(1.0), Convert.Unit.ETHER).send();
             return processTransferEventsResponse(humanStandardToken, transactionReceipt);
         } catch (InterruptedException | ExecutionException e) {
             throw new RuntimeException(e);
@@ -242,22 +248,22 @@ public class ContractService {
     @Deprecated
     private HumanStandardToken load(String contractAddress, List<String> privateFor) {
         TransactionManager transactionManager = new ClientTransactionManager(
-                quorum, nodeConfiguration.getFromAddress(), privateFor);
+                web3j, nodeConfiguration.getFromAddress(), privateFor);
         return HumanStandardToken.load(
-                contractAddress, quorum, transactionManager, GAS_PRICE, GAS_LIMIT);
+                contractAddress, web3j, transactionManager, GAS_PRICE, GAS_LIMIT);
     }
 
     @Deprecated
     private HumanStandardToken load(String contractAddress) {
         TransactionManager transactionManager = new ClientTransactionManager(
-                quorum, nodeConfiguration.getFromAddress(), Collections.emptyList());
+                web3j, nodeConfiguration.getFromAddress(), Collections.emptyList());
         return HumanStandardToken.load(
-                contractAddress, quorum, transactionManager, GAS_PRICE, GAS_LIMIT);
+                contractAddress, web3j, transactionManager, GAS_PRICE, GAS_LIMIT);
     }
 
     private HumanStandardToken load(String contractAddress, Credentials credentials) {
         return HumanStandardToken.load(
-                contractAddress, quorum, credentials, GAS_PRICE, GAS_LIMIT);
+                contractAddress, web3j, credentials, GAS_PRICE, GAS_LIMIT);
     }
 
     private long extractLongValue(BigInteger value) {
